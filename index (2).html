@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>過河謎題動畫演示 (自動播放版)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f8ff;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 { color: #333; }
+        #game-board {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fff;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .bank {
+            width: 30%;
+            min-height: 150px;
+            background-color: #e8f5e9;
+            border: 2px dashed #4caf50;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 5px;
+        }
+        #river {
+            width: 30%;
+            height: 150px;
+            background-color: #bbdefb;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #boat {
+            font-size: 3rem;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: left 1s ease-in-out;
+        }
+        .boat-left { left: 10px; }
+        .boat-right { left: calc(100% - 60px); }
+        
+        #controls { margin-top: 20px; }
+        button {
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            margin: 0 10px;
+            cursor: pointer;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+            min-width: 120px;
+        }
+        button:hover { background-color: #1976d2; }
+        #reset-btn { background-color: #ff9800; }
+        #reset-btn:hover { background-color: #f57c00; }
+        
+        #status-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #d32f2f;
+            margin: 20px 0;
+            min-height: 36px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🧠 經典過河謎題：15 步完美解法</h1>
+    <div id="status-text">初始狀態</div>
+
+    <div id="game-board">
+        <div id="left-bank" class="bank"></div>
+        <div id="river">
+            <div id="boat" class="boat-left">🛶</div>
+        </div>
+        <div id="right-bank" class="bank"></div>
+    </div>
+
+    <div id="controls">
+        <button id="play-btn" onclick="togglePlay()">▶️ 自動播放</button>
+        <span id="step-counter" style="font-size: 1.2rem; font-weight: bold; margin: 0 15px;">步驟: 0 / 15</span>
+        <button id="reset-btn" onclick="resetBoard()">🔄 重置</button>
+    </div>
+
+    <script>
+        const states = [
+            { desc: "初始狀態：所有人準備過河", L: "👨 👩 👦 👦 👧 👧 💂 🐕", R: "", boat: "left" },
+            { desc: "步驟 1：👨爸爸和👦兒子 過河", L: "👩 👦 👧 👧 💂 🐕", R: "👨 👦", boat: "right" },
+            { desc: "步驟 2：👨爸爸 返回", L: "👨 👩 👦 👧 👧 💂 🐕", R: "👦", boat: "left" },
+            { desc: "步驟 3：👨爸爸和👦兒子 過河", L: "👩 👧 👧 💂 🐕", R: "👨 👦 👦", boat: "right" },
+            { desc: "步驟 4：👨爸爸 返回", L: "👨 👩 👧 👧 💂 🐕", R: "👦 👦", boat: "left" },
+            { desc: "步驟 5：👨爸爸和👩媽媽 過河", L: "👧 👧 💂 🐕", R: "👨 👩 👦 👦", boat: "right" },
+            { desc: "步驟 6：👩媽媽 返回", L: "👩 👧 👧 💂 🐕", R: "👨 👦 👦", boat: "left" },
+            { desc: "步驟 7：👩媽媽和👧女兒 過河", L: "👧 💂 🐕", R: "👨 👩 👦 👦 👧", boat: "right" },
+            { desc: "步驟 8：🚨 關鍵！👨爸爸和👩媽媽 一起返回", L: "👨 👩 👧 💂 🐕", R: "👦 👦 👧", boat: "left" },
+            { desc: "步驟 9：👩媽媽和👧女兒 過河", L: "👨 💂 🐕", R: "👩 👦 👦 👧 👧", boat: "right" },
+            { desc: "步驟 10：👩媽媽 返回", L: "👨 👩 💂 🐕", R: "👦 👦 👧 👧", boat: "left" },
+            { desc: "步驟 11：👨爸爸和👩媽媽 過河", L: "💂 🐕", R: "👨 👩 👦 👦 👧 👧", boat: "right" },
+            { desc: "步驟 12：👨爸爸 返回，準備交接給僕人", L: "👨 💂 🐕", R: "👩 👦 👦 👧 👧", boat: "left" },
+            { desc: "步驟 13：💂僕人和🐕狗 過河！", L: "👨", R: "👩 👦 👦 👧 👧 💂 🐕", boat: "right" },
+            { desc: "步驟 14：👩媽媽 返回接最後一人", L: "👨 👩", R: "👦 👦 👧 👧 💂 🐕", boat: "left" },
+            { desc: "🎉 步驟 15：👨爸爸和👩媽媽 過河，任務完成！", L: "", R: "👨 👩 👦 👦 👧 👧 💂 🐕", boat: "right" }
+        ];
+
+        let currentStep = 0;
+        let isPlaying = false;
+        let playInterval;
+
+        function updateBoard() {
+            const state = states[currentStep];
+            document.getElementById("left-bank").innerText = state.L;
+            document.getElementById("right-bank").innerText = state.R;
+            document.getElementById("status-text").innerText = state.desc;
+            document.getElementById("step-counter").innerText = `步驟: ${currentStep} / 15`;
+            
+            const boat = document.getElementById("boat");
+            boat.className = state.boat === "left" ? "boat-left" : "boat-right";
+
+            // 如果到底了，自動停止播放
+            if (currentStep === states.length - 1 && isPlaying) {
+                togglePlay();
+            }
+        }
+
+        function togglePlay() {
+            const playBtn = document.getElementById("play-btn");
+            
+            if (isPlaying) {
+                // 暫停邏輯
+                clearInterval(playInterval);
+                isPlaying = false;
+                playBtn.innerText = "▶️ 繼續播放";
+                playBtn.style.backgroundColor = "#2196f3";
+            } else {
+                // 播放邏輯
+                if (currentStep === states.length - 1) {
+                    currentStep = 0; // 如果已經在最後一步，從頭開始
+                }
+                isPlaying = true;
+                playBtn.innerText = "⏸️ 暫停";
+                playBtn.style.backgroundColor = "#f44336"; // 變成紅色提示暫停
+                
+                // 立即更新一次，然後設定計時器
+                updateBoard();
+                playInterval = setInterval(() => {
+                    if (currentStep < states.length - 1) {
+                        currentStep++;
+                        updateBoard();
+                    }
+                }, 2500); // 2.5秒跳下一步
+            }
+        }
+
+        function resetBoard() {
+            if (isPlaying) {
+                togglePlay(); // 如果在播放中，先停止
+            }
+            currentStep = 0;
+            document.getElementById("play-btn").innerText = "▶️ 自動播放";
+            document.getElementById("play-btn").style.backgroundColor = "#2196f3";
+            updateBoard();
+        }
+
+        // 初始化畫面
+        updateBoard();
+    </script>
+</body>
+</html>
